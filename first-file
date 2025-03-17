@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Flag Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .feature-container {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        .admin-panel {
+            background-color: #f0f0f0;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-right: 10px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .access-denied {
+            color: #d32f2f;
+            font-weight: bold;
+            text-align: center;
+            padding: 40px;
+            border: 1px solid #d32f2f;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Feature Flag Demo</h1>
+    
+    <!-- Admin Panel (in a real app, this would be restricted to admins) -->
+    <div class="admin-panel">
+        <h2>Feature Flag Controls</h2>
+        <div class="toggle-container">
+            <label class="toggle">
+                <input type="checkbox" id="feature-toggle">
+                <span class="slider"></span>
+            </label>
+            <span>Enable New Feature</span>
+        </div>
+        
+        <div>
+            <label for="user-percentage">Percentage of users with access: </label>
+            <input type="range" id="user-percentage" min="0" max="100" value="0" style="width: 200px;">
+            <span id="percentage-value">0%</span>
+        </div>
+        
+        <div style="margin-top: 10px;">
+            <button id="save-settings">Save Settings</button>
+            <button id="clear-storage">Reset</button>
+        </div>
+    </div>
+    
+    <!-- Navigation -->
+    <div>
+        <button id="home-btn">Home</button>
+        <button id="feature-page-btn">Access New Feature</button>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div id="main-content">
+        <div id="home-content">
+            <h2>Welcome to the Home Page</h2>
+            <p>Click on "Access New Feature" to try accessing the feature-flagged page.</p>
+        </div>
+        
+        <div id="feature-content" class="feature-container">
+            <h2>New Feature Page</h2>
+            <p>Congratulations! You have access to this new feature.</p>
+            <p>This content is protected by a feature flag and is only visible to users who meet the criteria.</p>
+        </div>
+        
+        <div id="access-denied" class="access-denied" style="display: none;">
+            <h2>Access Denied</h2>
+            <p>Sorry, this feature is not available for your account at this time.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Feature Flag Configuration
+        const featureFlags = {
+            newFeaturePage: {
+                enabled: false,
+                userPercentage: 0,
+                userIds: [] // For specific user access
+            }
+        };
+        
+        // DOM Elements
+        const featureToggle = document.getElementById('feature-toggle');
+        const userPercentage = document.getElementById('user-percentage');
+        const percentageValue = document.getElementById('percentage-value');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const clearStorageBtn = document.getElementById('clear-storage');
+        const homeBtn = document.getElementById('home-btn');
+        const featurePageBtn = document.getElementById('feature-page-btn');
+        const homeContent = document.getElementById('home-content');
+        const featureContent = document.getElementById('feature-content');
+        const accessDenied = document.getElementById('access-denied');
+        
+        // Generate a consistent user ID (in a real app, this would come from your auth system)
+        function generateUserId() {
+            if (!localStorage.getItem('userId')) {
+                const userId = Math.floor(Math.random() * 1000000);
+                localStorage.setItem('userId', userId);
+            }
+            return localStorage.getItem('userId');
+        }
+        
+        const currentUserId = generateUserId();
+        
+        // Load saved feature flag settings
+        function loadFeatureFlags() {
+            const savedFlags = localStorage.getItem('featureFlags');
+            if (savedFlags) {
+                const parsedFlags = JSON.parse(savedFlags);
+                Object.assign(featureFlags, parsedFlags);
+                
+                // Update UI controls
+                featureToggle.checked = featureFlags.newFeaturePage.enabled;
+                userPercentage.value = featureFlags.newFeaturePage.userPercentage;
+                percentageValue.textContent = `${userPercentage.value}%`;
+            }
+        }
+        
+        // Save feature flag settings
+        function saveFeatureFlags() {
+            featureFlags.newFeaturePage.enabled = featureToggle.checked;
+            featureFlags.newFeaturePage.userPercentage = parseInt(userPercentage.value);
+            
+            localStorage.setItem('featureFlags', JSON.stringify(featureFlags));
+            alert('Feature flag settings saved!');
+        }
+        
+        // Check if user has access to the feature
+        function hasAccess() {
+            const flag = featureFlags.newFeaturePage;
+            
+            // If feature is disabled entirely, no access
+            if (!flag.enabled) {
+                return false;
+            }
+            
+            // Specific user access
+            if (flag.userIds.includes(currentUserId)) {
+                return true;
+            }
+            
+            // Percentage-based rollout
+            if (flag.userPercentage > 0) {
+                // Use userId to consistently determine access
+                const userNumber = parseInt(currentUserId) % 100;
+                return userNumber < flag.userPercentage;
+            }
+            
+            return false;
+        }
+        
+        // Show the selected content
+        function showContent(contentType) {
+            // Hide all content first
+            homeContent.style.display = 'none';
+            featureContent.style.display = 'none';
+            accessDenied.style.display = 'none';
+            
+            if (contentType === 'home') {
+                homeContent.style.display = 'block';
+            } else if (contentType === 'feature') {
+                if (hasAccess()) {
+                    featureContent.style.display = 'block';
+                } else {
+                    accessDenied.style.display = 'block';
+                }
+            }
+        }
+        
+        // Event Listeners
+        userPercentage.addEventListener('input', () => {
+            percentageValue.textContent = `${userPercentage.value}%`;
+        });
+        
+        saveSettingsBtn.addEventListener('click', saveFeatureFlags);
+        
+        clearStorageBtn.addEventListener('click', () => {
+            localStorage.removeItem('featureFlags');
+            loadFeatureFlags();
+            featureToggle.checked = false;
+            userPercentage.value = 0;
+            percentageValue.textContent = '0%';
+            alert('Settings reset!');
+        });
+        
+        homeBtn.addEventListener('click', () => showContent('home'));
+        
+        featurePageBtn.addEventListener('click', () => showContent('feature'));
+        
+        // Initialize
+        loadFeatureFlags();
+        showContent('home');
+        
+        // Display user ID (for demo purposes)
+        console.log(`Current User ID: ${currentUserId}`);
+    </script>
+</body>
+</html>
